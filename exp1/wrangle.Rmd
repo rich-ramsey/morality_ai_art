@@ -1,0 +1,253 @@
+---
+title: "wrangle"
+author: "Rich & Ionela"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This file wrangles raw data from the glasgow aesthetics project. It produces some summary data plots, saves out data files for modelling and further analysis in later scripts.
+
+It is largely based on Ionela's code, which was itself built upon our prior code for running the dose-response aesthetics work and the glasgow aesthetics project. 
+
+# load the libraries that we will be using #
+
+## install ##
+
+```{r install-pkg}
+# install.packages(c("tidyverse", "RColorBrewer", "patchwork"))
+```
+
+take a snapshot of loaded packages and update the lock.file using renv
+
+```{r snapshot-renv}
+# take a snapshot and update the lock.file
+# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
+```
+
+## load ##
+
+```{r load-pkg}
+pkg <- c("tidyverse", "RColorBrewer", "patchwork")
+
+lapply(pkg, library, character.only = TRUE)
+```
+
+## plot settings ##
+
+```{r}
+## Set the amount of dodge in figures
+pd <- position_dodge(0.7)
+pd2 <- position_dodge(1)
+```
+
+theme settings for ggplot
+
+```{r, eval = F}
+theme_set(
+  theme_bw() +
+    theme(text = element_text(size = 18), 
+          title = element_text(size = 18),
+          legend.position = "bottom")
+)
+```
+
+# section 1 #
+
+## read in previously wrangled data, if necessary ##
+
+this is good for plotting, if you've already wrangled and saved the data before.
+
+If you haven't already wrangled and saved, then skip this chunk.
+
+```{r}
+
+```
+
+## read in data and select the variables we need ##
+
+```{r}
+raw_data <- read_csv("exp1/data/morality_all.csv") %>%
+  rename(pid = Participant, group = Group, age = Age, gender = Gender) %>% # rename
+  select(pid, group, L01_AIUse:P42_AesApprec)
+head(raw_data)
+```
+
+# section 2 #
+
+## do some wrangling ##
+
+### filter by attention checks ###
+
+Items L41 and P42 are attentions checks. 
+For L41 the correct response for all questions is 1 = not at all, whereas for P42, 4 = very is the correct answer. 
+According to our pre-registration, ppts not passing the attention checks should be removed.
+
+```{r}
+dataf <- raw_data %>% 
+   filter(L41_AIUse == 1, L41_FinanGain == 1, L41_Prestige == 1, L41_ArtStatus == 1, L41_AesApprec == 1,
+          P42_AIUse == 4, P42_FinanGain == 4, P42_Prestige == 4, P42_ArtStatus == 4, P42_AesApprec == 4) 
+head(dataf)
+```
+
+### re-shape the data into different formats ###
+
+long format and create factors for variables also.
+
+```{r}
+datal <- dataf %>%
+  select(-starts_with(c("L41", "P42"))) %>%
+  pivot_longer(cols = L01_AIUse:P40_AesApprec,
+               names_sep = "_", 
+               names_to = c("item", "dv"),
+               values_to = "ratings") %>%
+  mutate(image_cat = if_else(str_starts(item, "L"), "landscape", "people"),
+         image_cat = factor(image_cat, levels = c("landscape", "people")),
+         item = as.numeric(str_remove(item, "[LP]")),
+         item = factor(item),
+         group = if_else(group == "noInfo", "no_info", group),
+         group = factor(group, levels = c("info", "no_info")),
+         dv = case_match(dv, 
+                         "AIUse" ~ "use", 
+                         "FinanGain" ~ "gain",
+                         "Prestige" ~ "prestige", 
+                         "ArtStatus" ~ "status", 
+                         "AesApprec" ~ "appreciation"), 
+         dv = factor(dv, levels = c("use","gain","prestige","status","appreciation")),
+         pid=factor(pid)) %>% 
+   select(pid, item, group, image_cat, everything())
+head(datal)
+str(datal)
+summary(datal)
+```
+
+data check
+
+```{r}
+data.check0 <- datal %>% 
+  group_by(item, group, image_cat) %>%
+  tally()
+head(data.check0)
+```
+
+convert from long into wide format (this is useful for modelling each dv separately)
+
+```{r}
+dataw <- datal %>% 
+  pivot_wider(names_from = "dv", values_from = "ratings")
+head(dataw)
+str(dataw)
+summary(dataw)
+```
+
+### add deviation coding ###
+
+```{r}
+datad <- dataw %>%
+  mutate(group = if_else(group == "no_info", -0.5, 0.5),
+         image_cat = if_else(image_cat == "landscape", -0.5, 0.5))
+head(datad)
+```
+
+take a look
+
+```{r}
+data.check1 <- datad %>%
+  distinct(group, image_cat) 
+data.check1
+
+data.check2 <- datad %>%
+  group_by(group, image_cat) %>% 
+  tally()
+data.check2
+```
+
+# section 3 #
+
+## calculate summary statistics ##
+
+```{r}
+summary_pid <- datal %>%
+   group_by(pid, group, image_cat, dv) %>%
+   summarise(mean=mean(ratings),
+             n=n(),
+             sd=sd(ratings),
+             sem=sd/sqrt(n))  %>%
+   ungroup() 
+head(summary_pid)
+```
+
+summary data at the group level
+
+```{r}
+# by block, dv
+summary <- datal %>% 
+  group_by(group, image_cat, dv) %>%
+   summarise(mean=mean(ratings),
+             n=50,
+             sd=sd(ratings),
+             sem=sd/sqrt(n))  %>%
+   ungroup() 
+summary
+```
+
+# section 4 #
+
+## plot ##
+
+violin
+
+```{r}
+# by block & dv
+p4.1 <- ggplot(summary, 
+              aes(x=group, y=mean, fill=group)) + 
+   geom_jitter(data=summary_pid, position=position_jitterdodge(dodge.width =1), 
+               alpha = 1, colour = "darkgrey") +
+   geom_violin(data=summary_pid, alpha = 0.7, position=pd2) +
+   geom_errorbar(aes(ymin=mean-sem, ymax=mean+sem), width=.2, position=pd2) +
+   geom_line(aes(group=dv)) +
+   geom_point(position=pd2, size =3) +
+   scale_colour_brewer(palette = "Accent")+
+   scale_fill_brewer(palette = "Accent")+
+   labs(x="", y = "ratings (1-5)")+
+   facet_grid(image_cat~dv) +
+   ggtitle("Ratings by group and condition")
+p4.1
+
+ggsave ("exp1/figures/ratings.jpeg", 
+        width = 8, height = 6)
+```
+
+density
+
+```{r}
+p4.2 <- ggplot(datal, aes(x = ratings, fill = group)) +
+  geom_density(alpha = 0.7) +
+  scale_colour_brewer(palette = "Accent")+
+  scale_fill_brewer(palette = "Accent")+
+  facet_grid(image_cat~dv) 
+p4.2
+
+ggsave ("exp1/figures/ratings_density.jpeg", 
+        width = 8, height = 6)
+```
+
+# section 6 #
+
+## save out a bunch of data files ##
+
+```{r}
+# data in long and wide formats
+write_csv(datal, "exp1/data/datal.csv")
+write_csv(dataw, "exp1/data/dataw.csv")
+
+# data with deviation coding
+write_csv(datad, "exp1/data/datad.csv")
+
+# summary statistics at the individual participant level in long format
+write_csv(summary_pid, "exp1/data/summary_pid.csv")
+write_csv(summary, "exp1/data/summary.csv")
+```

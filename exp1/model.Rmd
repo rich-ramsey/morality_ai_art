@@ -3,13 +3,15 @@ title: "model"
 author: "Rich"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This file runs some models for the morality aesthetics project
+This file builds some models for Exp1 in the morality aesthetics project.
 
 ## load the libraries that we will be using ## 
 
@@ -57,12 +59,6 @@ detectCores()
 
 ## plot settings ##
 
-```{r}
-## Set the amount of dodge in figures
-pd <- position_dodge(0.7)
-pd2 <- position_dodge(1)
-```
-
 theme settings for ggplot
 
 ```{r, eval = F}
@@ -72,6 +68,10 @@ theme_set(
           title = element_text(size = 18),
           legend.position = "bottom")
 )
+
+## Set the amount of dodge in figures
+pd <- position_dodge(0.7)
+pd2 <- position_dodge(1)
 ```
 
 ## read in data and create factors where necessary ##
@@ -211,12 +211,90 @@ chains
 plot(bf)
 ```
 
+maybe try with broader priors, as the above model worked nicely. 
+And broader priors might be more appropriate for a weakly informative approach.
+
+## bf.2 - full model (but with broader priors) ##
+
+## formula ##
+
+```{r}
+formula <- bf(mvbind(use, gain, prestige, status, appreciation) | thres(4, gr = item) ~ 
+                1 + group * image_cat +
+                (1 | p | item) +
+                (1 + image_cat | a | pid)) + 
+                set_rescor(FALSE)
+```
+
+## check the priors available ##
+
+```{r}
+get_prior(formula,
+          data = datad, family = cumulative("probit"))
+```
+
+## set priors ##
+
+```{r}
+# set priors #
+priors <- c(
+  set_prior('normal(0, 1.5)', class = 'Intercept',
+            resp = c("use", "gain", "prestige", "status", "appreciation")),
+    set_prior('normal(0, 1)', class = 'b',
+            resp = c("use", "gain", "prestige", "status", "appreciation")),
+    set_prior('normal(0, 1)', class = 'sd',
+            resp = c("use", "gain", "prestige", "status", "appreciation")),
+    set_prior('lkj(2)', class = 'cor')
+)
+```
+
+## run the model ##
+
+```{r}
+# this will help us track time
+t1 <- Sys.time()
+
+plan(multicore)
+bf.2 <- brm(formula = formula,
+        data = datad, family = cumulative("probit"),
+        prior = priors,
+        iter = 5000, warmup = 1000, cores = 20, chains = 4,
+        control = list(adapt_delta = 0.99, max_treedepth = 15),
+        save_pars = save_pars(all=TRUE),
+        seed = 123,
+        init = 0.1,
+        file = "exp1/models/bf.2")
+summary(bf.2)
+
+t2 <- Sys.time()
+
+t2 - t1
+
+# Time difference of ~ 10 hours imac.
+```
+
+take a look
+
+pp_check 
+
+```{r}
+# (just the understanding dv for now to take a look)
+pp_bf.2 <- pp_check(bf.2, ndraws = 100, resp = "use")
+pp_bf.2
+```
+
+chains
+
+```{r}
+plot(bf.2)
+```
+
 # section 2 #
 
 ## model diagnostics ##
 
 ```{r}
-post <- as_draws_df(bf)
+post <- as_draws_df(bf.2)
 str(post)
 ```
 
@@ -249,7 +327,7 @@ p_chains1 <- post1 %>%
 p_chains1
 
 # save it
-ggsave ("exp1/figures/bf_b_chains.jpeg",
+ggsave ("exp1/figures/b_chains.jpeg",
         width = 8, height = 6)
 ```
 
@@ -261,7 +339,7 @@ p_chains2 <- post2 %>%
 p_chains2
 
 # save it
-ggsave ("exp1/figures/bf_sd_chains.jpeg",
+ggsave ("exp1/figures/sd_chains.jpeg",
         width = 8, height = 6)
 ```
 
@@ -269,16 +347,16 @@ ggsave ("exp1/figures/bf_sd_chains.jpeg",
 
 ```{r}
 # # these two below are worth reporting.
-bf_neff <- mcmc_plot(bf, type = "neff")
+bf_neff <- mcmc_plot(bf.2, type = "neff")
 bf_neff
 # 
-bf_rhat <- mcmc_plot(bf, type = "rhat")
+bf_rhat <- mcmc_plot(bf.2, type = "rhat")
 bf_rhat
 # 
 bf_diag <- bf_neff / bf_rhat
 bf_diag
 
 ## save it
-ggsave("exp1/figures/bf_diag.jpeg",
+ggsave("exp1/figures/diag.jpeg",
        width = 8, height = 6)
 ```

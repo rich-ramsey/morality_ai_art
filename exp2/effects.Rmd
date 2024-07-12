@@ -89,19 +89,7 @@ bf <- readRDS("exp2/models/bf.rds")
 now read in the predictions, if available.
 
 ```{r}
-# d_fit <- read_csv("exp2/fits/d_fit.csv")
-# head(d_fit)
-# 
-# d_fit_summary <- read_csv("exp2/fits/d_fit_summary.csv") %>%
-#   mutate(group = factor(group, 
-#                         levels = c("info", "no_info")),
-#          image_type = factor(image_type, 
-#                              levels=c("landscape","people")),
-#          response = factor(response, 
-#                            levels = c("use", "gain", "prestige", "status", "appreciation")),
-#          .category = factor(.category, levels = unique(.category))) %>%
-#   group_by(group, image_type, .draw, response)
-# head(d_fit_summary)
+
 ```
 
 ## read in the data ##
@@ -354,6 +342,8 @@ epred_group <- epred %>%
          attribute = factor(attribute, levels = c("bad", "good"))) %>% 
   select(group, groupd, attribute, attributed, target, targetd, everything())
 epred_group
+
+write_csv(epred_group, "exp2/fits/epred_group.csv")
 ```
 
 plot the group data
@@ -371,4 +361,28 @@ p4.1
 
 ggsave("exp2/figures/preds_group.jpeg",
        width = 10, height = 8)
+```
+
+## make a table ##
+
+calculate quantiles
+
+```{r}
+epred_group_q <- epred_group %>%
+  group_by(group, attribute, target) %>% 
+  median_qi(.epred) %>% 
+  select(group, target, attribute, .epred, .lower, .upper) %>%
+  arrange(group, target, attribute) %>% 
+  mutate(across(where(is.double), \(x) round(x, 2)))
+epred_group_q
+```
+
+make a table
+
+```{r}
+p_pred_tab <- flextable(epred_group_q)
+p_pred_tab
+
+## save it
+save_as_image(p_pred_tab, path = "exp2/tables/ppred.png")
 ```

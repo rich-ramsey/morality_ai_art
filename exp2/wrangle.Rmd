@@ -1,0 +1,635 @@
+---
+title: "wrangle"
+author: "Rich & Ionela"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This file wrangles raw data from Exp2 of the morality aesthetics project, which speeded rt and accuracy data. It produces some summary data plots, saves out data files for modelling and further analysis in later scripts.
+
+# load the libraries that we will be using #
+
+## install ##
+
+```{r install-pkg}
+# install.packages(c("tidyverse", "RColorBrewer", "patchwork"))
+```
+
+take a snapshot of loaded packages and update the lock.file using renv
+
+```{r snapshot-renv}
+# take a snapshot and update the lock.file
+# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
+```
+
+## load ##
+
+```{r load-pkg}
+pkg <- c("tidyverse", "RColorBrewer", "patchwork")
+
+lapply(pkg, library, character.only = TRUE)
+```
+
+## plot settings ##
+
+theme settings for ggplot
+
+```{r, eval = F}
+theme_set(
+  theme_bw() +
+    theme(text = element_text(size = 18), 
+          title = element_text(size = 18),
+          legend.position = "bottom")
+)
+
+## Set the amount of dodge in figures
+pd <- position_dodge(0.7)
+pd2 <- position_dodge(1)
+```
+
+# section 1 #
+
+## read in previously wrangled data, if necessary ##
+
+this is good for plotting, if you've already wrangled and saved the data before.
+
+If you haven't already wrangled and saved, then skip this chunk.
+
+```{r}
+
+```
+
+## read in data and select the variables we need ##
+
+```{r}
+raw_data <- read_csv("exp2/data/data_all.csv") %>%
+  rename(pid = participant, group = AI_group, hit = Hit, false_alarm = FalseAlarm, 
+         miss = Miss, rt = trial_resp.rt) %>% # rename
+  select(pid, phase, group, target, attribute, hit, false_alarm, miss, rt) %>% 
+  filter(phase == "testing") %>% # for the main analyses we need the testing data only
+  mutate(rt = rt*1000)
+head(raw_data)
+summary(raw_data)
+
+## 32000 data points
+## 16320 NaNs?? Is this correct Ionela?
+## Yes, this is correct because it is a go-nogo task, so lots of trials the 
+## correct response is no response
+```
+
+# section 2 #
+
+## do some wrangling ##
+
+## renumber pid and add factors ##
+
+```{r}
+data <- raw_data %>%
+  mutate(pid = as.numeric(factor(pid, levels = unique(pid))),
+         pid=factor(pid),
+         group = factor(group, levels = c("low_quality", "high_quality")),
+         target = factor(target, levels = c("Impressionist Art", "Impressionist AI Art")),
+         attribute = factor(attribute, levels = c("bad", "good")))%>%
+  select(pid, group, target, attribute, hit, false_alarm, miss, rt )
+head(data)
+
+# take a look
+str(data)
+summary(data)
+
+## according to IB, summary() shows 320 trials/pid, 16000/ group, 32000 
+## observations in total, which is correct
+
+## take a look at pid
+data %>% 
+  distinct(pid)
+```
+
+data check
+
+```{r}
+data.check0 <- data %>% 
+  group_by(group, target, attribute) %>%
+  tally()
+head(data.check0)
+```
+
+## add deviation coding ##
+
+```{r}
+datad <- data %>%
+  mutate(groupd = recode(group, "low_quality" = -0.5,"high_quality" = 0.5),
+         targetd = recode(target, "Impressionist AI Art" = -0.5,"Impressionist Art" = 0.5),
+         attributed = recode(attribute, "bad" = -0.5, "good" = 0.5)) %>% 
+  select(pid, group, groupd, target, targetd, attribute, attributed, 
+         hit, false_alarm, miss, rt)
+head(datad)
+```
+
+check
+
+```{r}
+datad_check0 <- datad %>% 
+  group_by(group, groupd, target, targetd, attribute, attributed) %>%
+  tally()
+head(datad_check0)
+```
+
+## do some filtering ##
+
+according to our preregistration we will exclude individuals who have hits and false alarms accuracy of less than 55%.
+
+do some quick checks first
+
+```{r}
+## check 
+data %>% 
+  distinct(hit, false_alarm, miss)
+
+## hits
+hit <- data %>% 
+  filter(hit > 0)
+summary(hit)
+
+## hits
+miss <- data %>% 
+  filter(miss > 0)
+summary(miss)
+
+## false alarms
+fa <- data %>% 
+  filter(false_alarm > 0)
+summary(fa)
+```
+
+check for 50% accuracy in hits and false alarms 
+
+```{r}
+## Convert accuracy hits into sum and %  ##
+hitacc = datad %>%
+  group_by(pid, group, target, attribute) %>%
+  summarise(hit_sum = sum(hit), 
+            hit_perc = mean(hit) * 100, 
+            hit_perc_sd = sd(hit) * 100) %>%
+  ungroup()
+head(hitacc)
+
+## per group and conditions
+hitacc_low <- hitacc %>%
+   filter(hit_perc < 55)  # returns pts and conditions with less than 55% 
+head(hitacc_low)
+
+## pid 3
+
+# averaged across conditions
+hitacc_low_pid <- hitacc %>%
+   group_by(pid) %>% 
+   summarise(mean_hit_perc = mean(hit_perc)) %>% 
+   filter(mean_hit_perc < 55)  # returns pts and conditions with less than 55% wm acc
+head(hitacc_low_pid)
+```
+
+plot hits
+
+```{r}
+p2.1 <- hitacc %>% 
+  ggplot(aes(x=target, y=hit_perc, colour=attribute)) +
+  geom_jitter(position=position_jitterdodge(dodge.width =1)) +
+  facet_wrap(~group) +
+  labs(title = "hits")
+p2.1
+```
+
+filter pid #3 from low-quality group who scored less than 55%
+
+```{r}
+datad <- datad %>%
+  filter(!pid %in% c("3")) 
+head(datad)
+```
+
+now do the same for false alarms, but filter based on high false alarm rates
+
+```{r}
+## Convert accuracy false alarm into sum and %  ##
+falsealarmacc = datad %>%
+  group_by(pid, group, target, attribute) %>%
+  summarise(false_alarm_sum = sum(false_alarm), 
+            false_alarm_perc = mean(false_alarm) * 100, 
+            false_alarm_perc_sd = sd(false_alarm) * 100) %>%
+  ungroup()
+head(falsealarmacc)
+
+# per condition
+falsealarmacc_high <- falsealarmacc %>%
+   filter(false_alarm_perc > 44)  # returns pts and conditions with 45% or higher 
+head(falsealarmacc_high) 
+
+# averaged across conditions
+falsealarmacc_high_pid <- falsealarmacc %>%
+   group_by(pid) %>% 
+   summarise(mean_false_alarm_perc = mean(false_alarm_perc)) %>% 
+   filter(mean_false_alarm_perc > 44)   # returns pts and conditions with with 45% or higher 
+head(falsealarmacc_high_pid)
+```
+
+plot false alarms
+
+```{r}
+p2.2 <- falsealarmacc %>% 
+  ggplot(aes(x=target, y=false_alarm_perc, colour=attribute)) +
+  geom_jitter(position=position_jitterdodge(dodge.width =1)) +
+  facet_wrap(~group) +
+  labs(title = "false alarms")
+p2.2
+```
+
+check misses (just out of curiosity, rather than because we pre-registered it as an exclusion)
+
+```{r}
+miss_summary <- datad %>%
+  group_by(pid, group, target, attribute) %>%
+  summarise(miss_sum = sum(miss), 
+            miss_perc = mean(miss) * 100, 
+            miss_perc_sd = sd(miss) * 100) %>% 
+  ungroup()
+head(miss_summary)
+```
+
+plot misses
+
+```{r}
+p2.3 <- miss_summary %>% 
+  ggplot(aes(x=target, y=miss_perc, colour=attribute)) +
+  geom_jitter(position=position_jitterdodge(dodge.width =1)) +
+  facet_wrap(~group) +
+  labs(title = "misses")
+p2.3
+```
+
+plot together
+
+```{r}
+p2.4 <- p2.1 | p2.2 | p2.3
+p2.4
+
+ggsave("exp2/figures/hits_fa_misses.jpeg", 
+       width = 12, height = 6)
+```
+
+## filter RTs equal or less than 300ms ##
+
+according to the preregistration we will remove participants’ trials with an RT equal to or less than 300 ms as they might not reflect a genuine response to stimuli but an accidental key-press.
+
+```{r}
+datadf <- datad %>%
+  filter(rt > 300) 
+head(datadf)
+```
+
+check data filtered 
+
+```{r}
+dfcheck0 <- datadf %>% 
+  group_by(group, target, attribute) %>%
+  tally()
+head(dfcheck0)
+```
+
+# section 3 #
+
+## create summary data ##
+
+## summarise trials per hits & false alarms ##
+
+```{r}
+summary_trials <- datadf %>%
+  group_by(hit, false_alarm) %>%
+  summarise(rows = n()) %>%
+  ungroup()  
+head(summary_trials)
+```
+
+## calculate summary statistics for hits ##
+
+at the pid level
+
+```{r}
+summary_hit_pid = datadf %>%
+  group_by(pid, group, target, attribute) %>%
+  summarise(mean_hit = mean(hit),
+            n=sum(hit),
+            sd_hit = sd(hit),
+            sem_hit = sd_hit/sqrt(n)) %>%
+  ungroup()
+head(summary_hit_pid)
+```
+
+at the group level
+
+```{r}
+summary_hit_group = datadf %>%
+  group_by(group, target, attribute) %>%
+  summarise(mean_hit = mean(hit),
+            n=length(unique(pid)),
+            sd_hit = sd(hit),
+            sem_hit = sd_hit/sqrt(n)) %>%
+  ungroup()
+head(summary_hit_group)
+```
+
+## calculate summary statistics for false alarms ##
+
+at the pid level
+
+```{r}
+summary_fa_pid = datadf %>%
+  group_by(pid, group, target, attribute) %>%
+  summarise(mean_fa = mean(false_alarm),
+            n=sum(false_alarm),
+            sd_fa = sd(false_alarm),
+            sem_fa = sd_fa/sqrt(n)) %>%
+  ungroup()
+head(summary_fa_pid)
+```
+
+at the group level
+
+```{r}
+summary_fa_group = datadf %>%
+  group_by(group, target, attribute) %>%
+  summarise(mean_fa = mean(false_alarm),
+            n=length(unique(pid)),
+            sd_fa = sd(false_alarm),
+            sem_fa = sd_fa/sqrt(n)) %>%
+  ungroup()
+head(summary_fa_group)
+```
+
+# section 4 #
+
+## plot hits and false alarms ##
+
+density plots
+
+mean hits by pid
+
+```{r}
+p4.1 <- ggplot(summary_hit_pid, 
+              aes(x=mean_hit, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("Hit Rate Across Conditions")
+p4.1
+
+ggsave("exp2/figures/density_hits.jpeg", 
+       width = 8, height = 6)
+```
+
+mean fa by pid
+
+```{r}
+p4.2 <- ggplot(summary_fa_pid, 
+              aes(x=mean_fa, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("False alarms Across Conditions")
+p4.2
+
+ggsave("exp2/figures/density_fa.jpeg", 
+       width = 8, height = 6)
+```
+
+all hits by trial
+
+```{r}
+p4.3 <- ggplot(datadf, 
+              aes(x=hit, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("Hits Across Conditions")
+p4.3
+```
+
+all fa by trial
+
+```{r}
+p4.4 <- ggplot(datadf, 
+              aes(x=false_alarm, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("False alarms Across Conditions")
+p4.4
+```
+
+violin plots
+
+hits
+
+```{r}
+p4.5 <- ggplot(summary_hit_group, 
+              aes(x=target, y=mean_hit, fill=attribute, shape=attribute)) + 
+   geom_jitter(data=summary_hit_pid, aes(y=mean_hit), 
+               position=position_jitterdodge(dodge.width =1), alpha = 1, 
+               colour = "darkgrey") +
+   geom_violin(data=summary_hit_pid, aes(y=mean_hit), alpha = 0.7, position=pd2) +
+   geom_errorbar(aes(ymin=mean_hit-sem_hit, ymax=mean_hit+sem_hit), width=.2, position=pd2)+
+   geom_line(aes(group=group),position=pd2,group=1) +
+   geom_point(position=pd2, size =3) +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   labs(x="condition", y = "hits")+
+   facet_wrap(~group)+
+   ggtitle("Hit Rate Across Conditions")
+p4.5
+
+ggsave("exp2/figures/violin_hits.jpeg", 
+       width = 8, height = 6)
+```
+
+false alarms
+
+```{r}
+p4.6 <- ggplot(summary_fa_group, 
+              aes(x=target, y=mean_fa, fill=attribute, shape=attribute)) + 
+   geom_jitter(data=summary_fa_pid, aes(y=mean_fa), 
+               position=position_jitterdodge(dodge.width =1), alpha = 1, 
+               colour = "darkgrey") +
+   geom_violin(data=summary_fa_pid, aes(y=mean_fa), alpha = 0.7, position=pd2) +
+   geom_errorbar(aes(ymin=mean_fa-sem_fa, ymax=mean_fa+sem_fa), width=.2, position=pd2)+
+   geom_line(aes(group=group),position=pd2,group=1) +
+   geom_point(position=pd2, size =3) +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   labs(x="condition", y = "false alarms")+
+   facet_wrap(~group)+
+   ggtitle("False Alarm Rates Across Conditions")
+p4.6
+
+ggsave("exp2/figures/violin_fa.jpeg", 
+       width = 8, height = 6)
+```
+
+
+# section 5 #
+
+## calculate d-prime ##
+
+code hits and false alarms
+
+aggregate by ppt py condition
+
+```{r}
+dprime_aggr <- datadf %>%
+  group_by(pid, group, groupd, target, targetd, attribute, attributed) %>%
+  summarise(n=n(),
+            hits = sum(hit),
+            fa = sum(false_alarm),
+            hit_prop = mean(hit),
+            fa_prop = mean(false_alarm))
+head(dprime_aggr)
+```
+
+make corrections based on Nosek's approach
+
+```{r}
+dprime_c <- dprime_aggr %>% 
+  mutate(fa_propc = if_else(fa_prop == 0, 0.35 / n, fa_prop))
+head(dprime_c)
+
+## check
+dprime_c %>% 
+  filter(fa_prop == 0)
+```
+
+calculate z-scores 
+
+```{r}
+# Calculate hits_zscore and false_alarms_zscore
+dprime_z <- dprime_c %>%
+  group_by(pid, group) %>% 
+  mutate(hit_z = ((hit_prop - mean(hit_prop)) / sd(hit_prop)),
+         fa_z = ((fa_propc - mean(fa_propc)) / sd(fa_propc)))
+head(dprime_z)
+```
+
+and now convert to d-prime
+
+```{r}
+dprime <- dprime_z %>%
+  mutate(dprime = hit_z - fa_z)
+head(dprime)
+```
+
+# section 6 #
+
+## calculate summary statistics for d-prime ##
+
+at the group level
+
+```{r}
+summary_d = dprime %>%
+  group_by(group, target, attribute) %>%
+  summarise(mean_d = mean(dprime),
+            n=n(),
+            sd_d = sd(dprime),
+            sem_d = sd_d/sqrt(n)) %>%
+  ungroup()
+head(summary_d)
+```
+
+## plot d-prime ##
+
+density
+
+```{r}
+p6.1 <- ggplot(dprime, 
+              aes(x=dprime, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("d-prime across conditions")
+p6.1
+
+ggsave("exp2/figures/density_d.jpeg", 
+       width = 8, height = 6)
+```
+
+now log d prime?
+
+```{r}
+dprime <- dprime %>%
+  mutate(dprime3 = dprime + 3,
+         ldprime = log(dprime3, base = exp(10)))
+head(dprime)
+summary(dprime)
+
+dprime %>% 
+  filter(is.na(dprime))
+```
+
+plot
+
+```{r}
+p6.1b <- ggplot(dprime, 
+              aes(x=ldprime, colour=attribute)) +
+   geom_density() +
+   scale_colour_brewer(palette = "Dark2")+
+   scale_fill_brewer(palette = "Dark2")+
+   facet_grid(target~group)+
+   ggtitle("log(d-prime) across conditions")+
+   xlim(-0.3, 0.3)
+p6.1b
+
+ggsave("exp2/figures/density_log_d.jpeg", 
+       width = 8, height = 6)
+```
+
+violin
+
+```{r}
+p6.2 <- ggplot(dprime, aes(x = target, y= dprime, fill = attribute, shape=attribute)) +
+  geom_jitter(position=position_jitterdodge(dodge.width =1), alpha = 1, colour = "darkgrey") +
+  geom_violin(alpha = 0.7, position=pd2) +
+  geom_errorbar(data = summary_d, aes(y=mean_d, ymin=mean_d-sem_d, ymax=mean_d+sem_d), 
+                width=.2, position=pd2)+
+  geom_line(data = summary_d, aes(y=mean_d, group=group), position=pd2,group=1) +
+  geom_point(data = summary_d, aes(y=mean_d), position=pd2, size =3) +
+  facet_grid(~group) +
+  scale_fill_brewer(palette = "Dark2")+
+  labs(x="target", y = "d-prime")+
+  ggtitle("d-prime by target, attribute and group")
+p6.2
+
+ggsave("exp2/figures/violin_d.jpeg", 
+       width = 8, height = 6)
+```
+
+
+# section 7 #
+
+## save out some files for modelling ##
+
+```{r}
+## deviation coded and filtered
+write_csv(datadf, "exp2/data/datadf.csv")
+
+## dprime
+write_csv(dprime, "exp2/data/dprime.csv")
+```
+

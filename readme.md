@@ -1,6 +1,6 @@
 This project is the aesthetics morality project with Ionela and Emily, which was based in Zürich. 
 
-# Project folder and file strucuture #
+# Project folder and file structure #
 
 ## R project file ##
 

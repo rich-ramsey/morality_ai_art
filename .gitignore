@@ -8,3 +8,5 @@ models/
 tables/
 fits/
 from_ionela/
+reprex.Rmd
+reprex/

@@ -17,44 +17,27 @@ It is largely based on Ionela's code, which was itself built upon our prior code
 
 # load the libraries that we will be using #
 
-## install ##
-
-```{r install-pkg}
-# install.packages(c("tidyverse", "RColorBrewer", "patchwork"))
-```
-
-take a snapshot of loaded packages and update the lock.file using renv
-
-```{r snapshot-renv}
-# take a snapshot and update the lock.file
-# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
-```
-
-## load ##
-
 ```{r load-pkg}
 pkg <- c("tidyverse", "RColorBrewer", "patchwork")
 
 lapply(pkg, library, character.only = TRUE)
 ```
 
-## plot settings ##
-
-```{r}
-## Set the amount of dodge in figures
-pd <- position_dodge(0.7)
-pd2 <- position_dodge(1)
-```
+# plot settings #
 
 theme settings for ggplot
 
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
+
+## Set the amount of dodge in figures
+pd <- position_dodge(0.7)
+pd2 <- position_dodge(1)
 ```
 
 # section 1 #
@@ -110,8 +93,8 @@ datal <- dataf %>%
          image_cat = factor(image_cat, levels = c("landscape", "people")),
          item = as.numeric(str_remove(item, "[LP]")),
          item = factor(item),
-         group = if_else(group == "noInfo", "no_info", group),
-         group = factor(group, levels = c("info", "no_info")),
+         group = if_else(group == "noInfo", "none", group),
+         group = factor(group, levels = c("none", "info")),
          dv = case_match(dv, 
                          "AIUse" ~ "use", 
                          "FinanGain" ~ "gain",
@@ -149,7 +132,7 @@ summary(dataw)
 
 ```{r}
 datad <- dataw %>%
-  mutate(group = if_else(group == "no_info", -0.5, 0.5),
+  mutate(group = if_else(group == "none", -0.5, 0.5),
          image_cat = if_else(image_cat == "landscape", -0.5, 0.5))
 head(datad)
 ```
@@ -215,12 +198,13 @@ p4.1 <- ggplot(summary,
    scale_colour_brewer(palette = "Accent")+
    scale_fill_brewer(palette = "Accent")+
    labs(x="", y = "ratings (1-5)")+
+   theme(legend.position = "none")+
    facet_grid(image_cat~dv) +
    ggtitle("Ratings by group and condition")
 p4.1
 
 ggsave ("exp1/figures/ratings.jpeg", 
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
 density
@@ -234,7 +218,7 @@ p4.2 <- ggplot(datal, aes(x = ratings, fill = group)) +
 p4.2
 
 ggsave ("exp1/figures/ratings_density.jpeg", 
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
 # section 6 #

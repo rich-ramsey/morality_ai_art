@@ -15,36 +15,21 @@ This file wrangles raw data from Exp2 of the morality aesthetics project, which 
 
 # load the libraries that we will be using #
 
-## install ##
-
-```{r install-pkg}
-# install.packages(c("tidyverse", "RColorBrewer", "patchwork"))
-```
-
-take a snapshot of loaded packages and update the lock.file using renv
-
-```{r snapshot-renv}
-# take a snapshot and update the lock.file
-# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
-```
-
-## load ##
-
 ```{r load-pkg}
 pkg <- c("tidyverse", "RColorBrewer", "patchwork")
 
 lapply(pkg, library, character.only = TRUE)
 ```
 
-## plot settings ##
+# plot settings #
 
 theme settings for ggplot
 
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -280,7 +265,7 @@ p2.4 <- p2.1 | p2.2 | p2.3
 p2.4
 
 ggsave("exp2/figures/hits_fa_misses.jpeg", 
-       width = 12, height = 6)
+       width = 12, height = 6, dpi = 800)
 ```
 
 ## filter RTs equal or less than 300ms ##
@@ -391,7 +376,7 @@ p4.1 <- ggplot(summary_hit_pid,
 p4.1
 
 ggsave("exp2/figures/density_hits.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi=800)
 ```
 
 mean fa by pid
@@ -407,7 +392,7 @@ p4.2 <- ggplot(summary_fa_pid,
 p4.2
 
 ggsave("exp2/figures/density_fa.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi=800)
 ```
 
 all hits by trial
@@ -458,7 +443,7 @@ p4.5 <- ggplot(summary_hit_group,
 p4.5
 
 ggsave("exp2/figures/violin_hits.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi = 800)
 ```
 
 false alarms
@@ -481,7 +466,7 @@ p4.6 <- ggplot(summary_fa_group,
 p4.6
 
 ggsave("exp2/figures/violin_fa.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi = 800)
 ```
 
 
@@ -567,7 +552,7 @@ p6.1 <- ggplot(dprime,
 p6.1
 
 ggsave("exp2/figures/density_d.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi = 800)
 ```
 
 now log d prime?
@@ -597,7 +582,7 @@ p6.1b <- ggplot(dprime,
 p6.1b
 
 ggsave("exp2/figures/density_log_d.jpeg", 
-       width = 8, height = 6)
+       width = 8, height = 6, dpi=800)
 ```
 
 violin
@@ -617,7 +602,7 @@ p6.2 <- ggplot(dprime, aes(x = target, y= dprime, fill = attribute, shape=attrib
 p6.2
 
 ggsave("exp2/figures/violin_d.jpeg", 
-       width = 8, height = 6)
+       width = 10, height = 6, dpi=800)
 ```
 
 

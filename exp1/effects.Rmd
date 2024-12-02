@@ -15,24 +15,6 @@ This file visualises and tabulates parameters from Exp1 of the morality aestheti
 
 # load the libraries that we will be using #
 
-## install ##
-
-only the additional packages (not already installed are required).
-in this case, that is whatever we use to make tables.
-
-```{r install-pkg}
-# install.packages(c("flextable"))
-```
-
-take a snapshot of loaded packages and update the lock.file using renv
-
-```{r snapshot-renv}
-# take a snapshot and update the lock.file
-# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
-```
-
-## load ##
-
 ```{r load-pkg}
 pkg <- c("tidyverse", "RColorBrewer", "patchwork", "brms", 
          "tidybayes", "bayesplot", "future", "parallel", "flextable")
@@ -40,7 +22,7 @@ pkg <- c("tidyverse", "RColorBrewer", "patchwork", "brms",
 lapply(pkg, library, character.only = TRUE)
 ```
 
-## adjust multicore settings ##
+# adjust multicore settings #
 
 ```{r set-options}
 options(mc.cores = parallel::detectCores(),
@@ -52,15 +34,15 @@ supportsMulticore()
 detectCores()
 ```
 
-## plot settings ##
+# plot settings #
 
 theme settings for ggplot
 
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -69,7 +51,7 @@ pd <- position_dodge(0.7)
 pd2 <- position_dodge(1)
 ```
 
-## table settings ##
+# table settings #
 
 ```{r}
 set_flextable_defaults(
@@ -78,37 +60,19 @@ set_flextable_defaults(
 )
 ```
 
-## read in previously saved brms models object files and/or fits ##
+# read in previously saved brms models object files and/or fits #
 
 If available, this saves time computing them each time 
 
 ```{r}
-bf <- readRDS("exp1/models/bf.rds")
-bf.2 <- readRDS("exp1/models/bf.2.rds")
+bf <- readRDS("exp1/models/bf.rds") ## full model
+bf.2 <- readRDS("exp1/models/bf.2.rds") ## full model with broader priors
 ```
 
-now read in the fits, if available.
+# read in the data #
 
 ```{r}
-d_fit <- read_csv("exp1/fits/d_fit.csv")
-head(d_fit)
-
-d_fit_summary <- read_csv("exp1/fits/d_fit_summary.csv") %>%
-  mutate(group = factor(group, 
-                        levels = c("info", "no_info")),
-         image_type = factor(image_type, 
-                             levels=c("landscape","people")),
-         response = factor(response, 
-                           levels = c("use", "gain", "prestige", "status", "appreciation")),
-         .category = factor(.category, levels = unique(.category))) %>%
-  group_by(group, image_type, .draw, response)
-head(d_fit_summary)
-```
-
-## read in the data ##
-
-```{r}
-datad <- read_csv("exp1/data/datad.csv") 
+datad <- read_csv("exp1/data/datad.csv") %>% 
   mutate(pid = factor(pid, levels = unique(pid)),
          item = factor(item, levels = unique(item)))
 head(datad)
@@ -210,24 +174,20 @@ check.labels <- tidy_fixed %>%
 check.labels
 
 ## plot
-p_tidy_fixed <- ggplot(tidy_fixed, aes(x = value, y = fct_rev(term), fill=term)) +  
-  geom_vline(xintercept = 0, color = "grey", alpha = 5/10) +
-  stat_halfeye(point_size = 1) +
-  labs(title = "Multivariate model coefficient plot for fixed effects (predictors)",
+p_tidy_fixed <- ggplot(tidy_fixed, aes(x = value, y = fct_rev(term), 
+                                       fill=term)) +  
+  geom_vline(xintercept = 0, color = "red", alpha = 5/10) +
+  stat_halfeye(alpha = 0.7, point_size = 1) +
+  labs(title = "Coefficient plot for fixed effects",
        x = NULL, y = NULL) +
   scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        axis.text.y  = element_text(hjust = 0),
-        axis.ticks.y = element_blank(),
-        legend.position = "none")+
-  # coord_cartesian(xlim =c(-1, 1))+
-  # scale_x_continuous(breaks=seq(-1, 1, 1))+
-  facet_wrap(~dv, ncol = 5)
+  theme(legend.position = "none")+
+  facet_wrap(~dv, ncol = 5) +
+  scale_x_continuous(limits = c(-3.5, 2), breaks=seq(-2, 2, 2))
 p_tidy_fixed
 
 ggsave ("exp1/figures/fixef.jpeg",
-        width = 8, height = 6)
+        width = 10, height = 6, dpi=800)
 ```
 
 ## make a table of fixed effects ##
@@ -298,22 +258,16 @@ check.vary
 
 p_tidy_vary <- ggplot(tidy_vary, aes(x = value, y = fct_rev(term), fill=term)) +  
   geom_vline(xintercept = 0, color = "grey", alpha = 5/10) +
-  stat_halfeye() +
+  stat_halfeye(alpha=0.7) +
   labs(title = "SD plot for varying effects",
        x = NULL, y = NULL) +
   scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        # axis.text.y  = element_blank(),
-        # axis.ticks.y = element_blank(),
-        legend.position = "none") +
-  # coord_cartesian(xlim =c(0, 1.5)) +
-  # scale_x_continuous(breaks=seq(0,1.5,0.5)) +
+  theme(legend.position = "none") +
   facet_wrap(~dv,ncol=5)
 p_tidy_vary
 
 ggsave ("exp1/figures/vary.jpeg",
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
 ## variance within group levels i.e., at the individual item and participant level ##
@@ -398,304 +352,6 @@ p_tidy_varyvals <- ggplot(tidy_varyvals, aes(x=rank, y=Estimate, colour=outlier)
 p_tidy_varyvals
 
 ggsave ("exp1/figures/varyvals.jpeg",
-        width = 8, height = 6)
+        width = 8, height = 6, dpi = 800)
 ```
 
-# section 4 #
-
-## Plot in the original probability metric as a function of conditions ##
-
-## fit 1 ##
-
-```{r}
-plan(multicore)
-d_fit.1 <- datad %>%
-  distinct(pid, item, group, image_cat) %>%
-  add_epred_draws(bf.2,
-                   ndraws=100,
-                   resp = "use") %>% 
-  mutate(response = "response1")
-head(d_fit.1)
-
-# write_csv(d_fit.1, "exp1/fits/d_fit.1.csv")
-```
-
-## fit 2 ##
-
-```{r}
-plan(multicore)
-d_fit.2 <- datad %>%
-  distinct(pid, item, group, image_cat) %>%
-  add_epred_draws(bf.2,
-                   ndraws=100,
-                   resp = "gain") %>% 
-  mutate(response = "response2")
-head(d_fit.2)
-
-# write_csv(d_fit.2, "fits/d_fit.2.csv")
-```
-
-## fit 3 ##
-
-```{r}
-plan(multicore)
-d_fit.3 <- datad %>%
-  distinct(pid, item, group, image_cat) %>%
-  add_epred_draws(bf.2,
-                   ndraws=100,
-                   resp = "prestige") %>% 
-  mutate(response = "response3")
-head(d_fit.3)
-
-# write_csv(d_fit.3, "fits/d_fit.3.csv")
-```
-
-## fit 4 ##
-
-```{r}
-plan(multicore)
-d_fit.4 <- datad %>%
-  distinct(pid, item, group, image_cat) %>%
-  add_epred_draws(bf.2,
-                   ndraws=100,
-                   resp = "status") %>% 
-  mutate(response = "response4")
-head(d_fit.4)
-
-# write_csv(d_fit.4, "fits/d_fit.4.csv")
-```
-
-## fit 5 ##
-
-```{r}
-plan(multicore)
-d_fit.5 <- datad %>%
-  distinct(pid, item, group, image_cat) %>%
-  add_epred_draws(bf.2,
-                   ndraws=100,
-                   resp = "appreciation") %>% 
-  mutate(response = "response5")
-head(d_fit.5)
-
-# write_csv(d_fit.5, "fits/d_fit.5.csv")
-```
-
-## combine the fits ##
-
-```{r}
-d_fit <- bind_rows(d_fit.1, d_fit.2, d_fit.3, d_fit.4, d_fit.5)
-head(d_fit)
-str(d_fit)
-
-write_csv(d_fit, "exp1/fits/d_fit.csv")
-
-check.labels <- d_fit %>%
-  distinct(group, image_cat, .row, .category) 
-head(check.labels)
-tail(check.labels)
-```
-
-## create a summary fit ##
-
-mutate and rename the column that shows the DV, then create and rename factors, and summarise across items.
-
-```{r}
-d_fit_summary <- d_fit %>% 
-  mutate(response = if_else(response == "response1", "use",
-                    if_else(response == "response2", "gain",
-                    if_else(response == "response3", "prestige",
-                    if_else(response == "response4", "status", "appreciation")))),
-         image_type = if_else(image_cat == -0.5, "landscape", "people"),
-         group = if_else(group == -0.5, "no_info", "info")) %>% 
-  mutate(response = factor(response, 
-                           levels = c("use", "gain", "prestige", "status", "appreciation")),
-         pid = factor(pid, levels = unique(pid)),
-         item = factor(item, levels = unique(item)),
-         image_type = factor(image_type, 
-                             levels = c("landscape", "people")),
-         .category = factor(.category, levels = unique(.category))) %>% 
-  group_by(group, image_type, .draw, response, .category) %>% 
-  summarise(mean=mean(.epred)) # .groups
-head(d_fit_summary)
-tail(d_fit_summary)
-
-check.labels <- d_fit_summary %>%
-  group_by(group, image_type, .category, response) %>%
-  distinct(group, image_type, .category, response)
-head(check.labels)
-tail(check.labels)
-
-# note - .category is the 1-5 response scale
-
-# save out a summary fit file
-write_csv(d_fit_summary, "exp1/fits/d_fit_summary.csv")
-```
-
-and plot
-
-```{r}
-# note - error bars cannot be seen currently. point is too large. either modify point/interval sizes or plot separately.
-p_fit <- ggplot(d_fit_summary, 
-                aes(x = group, y = mean, color = .category)) +
-  stat_pointinterval(position = position_dodge(width = 0.9), fatten_point = 0.5) +
-  scale_size_continuous(guide = "none") +
-  labs(title = "P(category | condition)", 
-       x = "condition") +
-  theme(legend.direction = "horizontal", legend.position = "top", 
-        legend.title = element_blank(), legend.text = element_text(size=10, face="bold")) +
-  guides(colour = guide_legend(nrow=1, override.aes = list(alpha=1,size=7)))+
-  facet_grid(response~image_type)
-p_fit
-# save it
-# ggsave ("figures/p_fit_aesthetics.jpeg")
-
-p_fit_n <- ggplot(d_fit_summary, 
-                  aes(x = .category, y = mean, color = group)) +
-  stat_pointinterval(position = position_dodge(width = .7), fatten_point = 0.5) +
-  scale_size_continuous(guide = "none") +
-  theme_bw() +
-  ggtitle("P(category | condition)") +
-  theme(legend.position = "bottom", legend.title = element_blank(), 
-        legend.text = element_text(size=10, face="bold")) +
-  facet_grid(response~image_type)
-p_fit_n
-# ggsave ("figures/p_fit_n_aesthetics.jpeg")
-```
-
-## plot in the rating scale metric as a function of conditions ##
-
-```{r}
-d_fit_alt <- d_fit_summary %>% 
-  mutate(sum=cumsum(mean),cat_by_prob=as.numeric(.category) * mean) %>% 
-  mutate(sum2=sum(cat_by_prob))
-head(d_fit_alt)
-```
-
-## and plot ##
-
-```{r}
-# using facet_wrap
-p_fit_alt <- ggplot(d_fit_alt, aes(x = group, y = sum2, group =.draw, colour=.draw)) +
-  geom_line(alpha = 4/10) +
-  scale_y_continuous("response", limits=c(1, 5), breaks=seq(1, 5, 1)) +
-  labs(title = "ratings by condition", 
-       x = "condition") +
-  theme(legend.position = "none")+
-  facet_grid(response~image_type)
-p_fit_alt
-# save it
-# ggsave ("figures/plot_p3.jpeg")
-```
-
-## overlaying lines (to emphasise overlap or not) ##
-
-```{r}
-p_fit_alt.2 <- ggplot(d_fit_alt, aes(x = group, y = sum2, group =interaction(image_type,.draw), 
-                                       colour=image_type)) +
-  geom_line(alpha = 4/10) +
-  scale_y_continuous("response", limits=c(1, 5), breaks=seq(1, 5, 1)) +
-  labs(title = "Ratings by group and image type", 
-       x = "group") +
-  scale_colour_brewer(palette = "Dark2") +
-  theme(legend.position = "bottom")+
-  guides(colour = guide_legend(override.aes = list(alpha=1,size=2)))+
-  facet_wrap(~response, ncol = 5)
-p_fit_alt.2
-
-ggsave ("exp1/figures/ppreds_line.jpeg",
-        width = 8, height = 6)
-```
-
-## quantile intervals ##
-
-wrangle
-
-```{r}
-summary_d_fit_alt <- d_fit_alt %>%
-  summarise(mean = mean(sum2))
-head(summary_d_fit_alt)
-```
-
-plot
-
-```{r}
-p_pred <- ggplot(summary_d_fit_alt, aes(x = mean, y = fct_rev(response), fill=group)) +  
-  geom_vline(xintercept = 0, color = "grey", alpha = 5/10) +
-  stat_halfeye(point_size = 1) +
-  labs(title = "Posterior predictions by group and image_type",
-       x = "response", y = NULL) +
-  scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        axis.text.y  = element_text(hjust = 0),
-        axis.ticks.y = element_blank()) +
-  facet_wrap(~image_type, ncol = 2)
-p_pred
-
-ggsave ("exp1/figures/ppreds.jpeg",
-        width = 8, height = 6)
-```
-
-## calculate difference scores based on group ##
-
-wrangle 
-
-```{r}
-d_fit_diff <- d_fit_alt %>%
-  summarise(mean = mean(sum2)) %>% 
-  pivot_wider(names_from = "group",
-              values_from = "mean") %>% 
-  mutate(diff = no_info - info)
-head(d_fit_diff)
-```
-
-plot
-
-```{r}
-p_pred_diff <- ggplot(d_fit_diff, aes(x = diff, y = fct_rev(response), fill=response)) +  
-  geom_vline(xintercept = 0, color = "grey", alpha = 5/10) +
-  stat_halfeye(point_size = 1) +
-  labs(title = "Posterior predictions for the difference between group (no info > info)",
-       x = NULL, y = NULL) +
-  scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        axis.text.y  = element_text(hjust = 0),
-        axis.ticks.y = element_blank(),
-        legend.position = "none") +
-  facet_wrap(~image_type, ncol = 2)
-p_pred_diff
-
-ggsave ("exp1/figures/ppreds_diff.jpeg",
-        width = 8, height = 6)
-```
-
-calculate quantiles on the difference scores
-
-```{r}
-pred_diff_q <- d_fit_diff %>%
-  group_by(image_type, response) %>% 
-  median_qi(diff) %>% 
-  select(image_type, response, diff, .lower, .upper) %>% 
-  mutate(across(where(is.double), \(x) round(x, 2)))
-pred_diff_q
-```
-
-make a table
-
-```{r}
-p_pred_tab <- flextable(pred_diff_q)
-p_pred_tab
-
-## save it
-save_as_image(p_pred_tab, path = "exp1/tables/ppred_diff.png")
-```
-
-Maybe a dumb question, but why do the posterior preds look like the raw data (e.g., differences by group) more so than the fixed effects of group in the model output (where only one dv has a 95% interval non-overlapping with zero ??)??.
-
-
-print session info
-
-```{r}
-sessionInfo()
-```

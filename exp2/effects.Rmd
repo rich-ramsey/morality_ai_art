@@ -15,24 +15,6 @@ This file visualises and tabulates parameters from Exp2 of the morality aestheti
 
 # load the libraries that we will be using #
 
-## install ##
-
-only the additional packages (not already installed are required).
-in this case, that is whatever we use to make tables.
-
-```{r install-pkg}
-# install.packages(c("flextable"))
-```
-
-take a snapshot of loaded packages and update the lock.file using renv
-
-```{r snapshot-renv}
-# take a snapshot and update the lock.file
-# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
-```
-
-## load ##
-
 ```{r load-pkg}
 pkg <- c("tidyverse", "RColorBrewer", "patchwork", "brms", 
          "tidybayes", "bayesplot", "future", "parallel", "flextable")
@@ -40,7 +22,7 @@ pkg <- c("tidyverse", "RColorBrewer", "patchwork", "brms",
 lapply(pkg, library, character.only = TRUE)
 ```
 
-## adjust multicore settings ##
+# adjust multicore settings #
 
 ```{r set-options}
 options(mc.cores = parallel::detectCores(),
@@ -52,15 +34,15 @@ supportsMulticore()
 detectCores()
 ```
 
-## plot settings ##
+# plot settings #
 
 theme settings for ggplot
 
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -69,7 +51,7 @@ pd <- position_dodge(0.7)
 pd2 <- position_dodge(1)
 ```
 
-## table settings ##
+# table settings #
 
 ```{r}
 set_flextable_defaults(
@@ -78,7 +60,7 @@ set_flextable_defaults(
 )
 ```
 
-## read in previously saved brms models object files and/or fits ##
+# read in previously saved brms models object files and/or fits #
 
 If available, this saves time computing them each time 
 
@@ -86,13 +68,7 @@ If available, this saves time computing them each time
 bf <- readRDS("exp2/models/bf.rds")
 ```
 
-now read in the predictions, if available.
-
-```{r}
-
-```
-
-## read in the data ##
+# read in the data #
 
 ```{r}
 datadp <- read_csv("exp2/data/dprime.csv") %>%
@@ -172,21 +148,18 @@ check.labels <- tidy_fixed %>%
 check.labels
 
 ## plot
-p_tidy_fixed <- ggplot(tidy_fixed, aes(x = value, y = fct_rev(term), fill=term)) +  
-  geom_vline(xintercept = 0, color = "grey", alpha = 5/10) +
-  stat_halfeye(point_size = 1) +
-  labs(title = "Model coefficient plot for fixed effects (predictors)",
+p_tidy_fixed <- ggplot(tidy_fixed, aes(x = value, y = fct_rev(term), 
+                                       fill=term)) +  
+  geom_vline(xintercept = 0, color = "red", alpha = 5/10) +
+  stat_halfeye(alpha=0.7, point_size = 1) +
+  labs(title = "Coefficient plot for fixed effects",
        x = NULL, y = NULL) +
   scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        axis.text.y  = element_text(hjust = 0),
-        axis.ticks.y = element_blank(),
-        legend.position = "none")
+  theme(legend.position = "none")
 p_tidy_fixed
 
 ggsave ("exp2/figures/fixef.jpeg",
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
 ## make a table of fixed effects ##
@@ -249,15 +222,11 @@ p_tidy_vary <- ggplot(tidy_vary, aes(x = value, y = fct_rev(term), fill=term)) +
   labs(title = "SD plot for varying effects",
        x = NULL, y = NULL) +
   scale_fill_brewer(palette="Dark2") +
-  theme(panel.grid   = element_blank(),
-        panel.grid.major.y = element_line(color = alpha("firebrick4", 1/2), linetype = 3),
-        # axis.text.y  = element_blank(),
-        # axis.ticks.y = element_blank(),
-        legend.position = "none") 
+  theme(legend.position = "none") 
 p_tidy_vary
 
 ggsave ("exp2/figures/vary.jpeg",
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
 ## variance within group levels i.e., at the individual item and participant level ##
@@ -302,87 +271,6 @@ p_tidy_varyvals <- ggplot(vary_pt, aes(x=rank, y=Estimate, colour=outlier))+
 p_tidy_varyvals
 
 ggsave ("exp2/figures/varyvals.jpeg",
-        width = 8, height = 6)
+        width = 8, height = 6, dpi=800)
 ```
 
-# section 4 #
-
-## posterior predictions ##
-
-```{r}
-epred <- datadp %>%
-  group_by(pid, groupd, targetd, attributed) %>% 
-  add_epred_draws(bf) 
-head(epred)
-```
-
-pred check
-
-```{r}
-## check the right number of samples per pid
-epred %>%
-  ungroup() %>%
-  group_by(pid, groupd, targetd, attributed) %>% 
-  tally()
-```
-
-create group data
-
-```{r}
-epred_group <- epred %>%
-  ungroup() %>% 
-  group_by(groupd, targetd, attributed, .draw) %>% 
-  summarise(group_epred = mean(.epred)) %>% 
-  rename(.epred = group_epred) %>% 
-  mutate(group = if_else(groupd == -0.5, "low_quality", "high_quality"),
-         target = if_else(targetd == -0.5,"Impressionist AI Art", "Impressionist Art"),
-         attribute = if_else(attributed == -0.5, "bad", "good"),
-         group = factor(group, levels = c("low_quality", "high_quality")), 
-         target = factor(target, levels = c("Impressionist Art", "Impressionist AI Art")),
-         attribute = factor(attribute, levels = c("bad", "good"))) %>% 
-  select(group, groupd, attribute, attributed, target, targetd, everything())
-epred_group
-
-write_csv(epred_group, "exp2/fits/epred_group.csv")
-```
-
-plot the group data
-
-```{r}
-p4.1 <-
-  ggplot(data = epred_group, aes(x = target, y = .epred, 
-                                 fill = attribute)) +
-  stat_halfeye(alpha = 0.7, position = position_dodge(width = 1)) +
-  scale_fill_brewer(palette = "Dark2") +
-  scale_colour_brewer(palette = "Dark2") +
-  labs(title = "Posterior predictions") +
-  facet_wrap(~group)
-p4.1
-
-ggsave("exp2/figures/preds_group.jpeg",
-       width = 10, height = 8)
-```
-
-## make a table ##
-
-calculate quantiles
-
-```{r}
-epred_group_q <- epred_group %>%
-  group_by(group, attribute, target) %>% 
-  median_qi(.epred) %>% 
-  select(group, target, attribute, .epred, .lower, .upper) %>%
-  arrange(group, target, attribute) %>% 
-  mutate(across(where(is.double), \(x) round(x, 2)))
-epred_group_q
-```
-
-make a table
-
-```{r}
-p_pred_tab <- flextable(epred_group_q)
-p_pred_tab
-
-## save it
-save_as_image(p_pred_tab, path = "exp2/tables/ppred.png")
-```

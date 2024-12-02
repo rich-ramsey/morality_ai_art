@@ -34,7 +34,7 @@ Exp3 has an additional folder:
 5. /draws/
 
 Here, we saved the posterior draws when comparisons between conditions (low, medium and high) were calculated.
-This is because it took several minutes ot compute.
+This is because it took several minutes to compute.
 
 # Raw data and models #
 

@@ -20,15 +20,21 @@ This file builds Bayesian regression models.
 
 This file visualises and tabulates parameters.
 
-## Within each experimental folder (exp1, exp2), there are five folders, which have largely self-explanatory titles: ##
+## Within each experimental folder (exp1, exp2), there are four folders, which have largely self-explanatory titles: ##
 
 1. /figures/
 2. /tables/
 3. /models/
 4. /data/
-5. /fits/
 
 Note - you will need to create these folders in each experimental folder *before* you run the code, otherwise R will complain.
+
+Exp3 has an additional folder:
+
+5. /draws/
+
+Here, we saved the posterior draws when comparisons between conditions (low, medium and high) were calculated.
+This is because it took several minutes ot compute.
 
 # Raw data and models #
 
